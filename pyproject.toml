@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transcriptor"
+version = "0.1.0"
+description = "Local inbox-to-transcript pipeline for personal voice memos."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "faster-whisper>=1.1.0",
+]
+
+[project.optional-dependencies]
+diarization = [
+  "pyannote.audio>=4.0.7,<5",
+]
+
+[project.scripts]
+transcriptor-inbox = "transcriptor.cli:main"
+transcriptor-speakers = "transcriptor.speakers:main"
+
+[tool.setuptools.packages.find]
+include = ["transcriptor*"]

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+*.egg-info/
+/build/
+/dist/
+/.coverage
+/.pytest_cache/
+
+# Audio, transcripts, speaker names, manifests, and local test runs are private runtime data.
+/data/
+/tmp/
