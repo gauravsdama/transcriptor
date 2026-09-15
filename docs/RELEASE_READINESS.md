@@ -20,8 +20,8 @@ CLI-only is the release decision. Scheduling and batch processing are the primar
 
 - `data/` and `tmp/` are ignored in full because they contain audio, transcripts, absolute source paths, speaker mappings, and hashes.
 - The current local `data/` folder contains real recordings and transcripts. They were not modified or inspected for editorial content and must not be added to source control or a release archive.
-- Tokens may be supplied through `HUGGINGFACE_TOKEN` or `HF_TOKEN`; documentation prefers the environment so secrets do not enter shell history.
-- The package has no network service or inbound port. The required `small` Whisper model is downloaded during first-run setup with `scripts/download_models.py`; cached inference is local.
+- `HUGGINGFACE_TOKEN` or `HF_TOKEN` is used only by `scripts/download_models.py` to download the gated diarization model during setup. Runtime commands do not accept or require a token.
+- The package has no network service or inbound port. Runtime loading uses cached files only, sets Hugging Face and Transformers offline modes, and disables pyannote telemetry before import.
 
 ## Verification evidence
 
@@ -62,4 +62,4 @@ The generated reports are `docs/dependencies/sbom.cdx.json` and `docs/dependenci
 
 ## Status
 
-**Ready for source publication with diarization still experimental.** Git provenance, Apache-2.0 licensing, full locked installation, Whisper model setup, real-recording transcription, SBOM, and dependency license reporting are in place. One validation remains blocked by owner credentials: accept the `pyannote/speaker-diarization-community-1` terms, provide `HUGGINGFACE_TOKEN`, and rerun a representative two-speaker recording with `--diarize --num-speakers 2`. Until then, keep diarization labeled experimental.
+**Ready for source publication with diarization still experimental.** Git provenance, Apache-2.0 licensing, full locked installation, Whisper model setup, real-recording transcription, SBOM, and dependency license reporting are in place. One validation remains blocked by model access: accept the `pyannote/speaker-diarization-community-1` terms, use `HUGGINGFACE_TOKEN` once with `scripts/download_models.py --diarization`, and rerun a representative two-speaker recording with `--diarize --num-speakers 2`. The validation run itself is offline. Until then, keep diarization labeled experimental.

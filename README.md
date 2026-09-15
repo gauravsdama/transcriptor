@@ -15,7 +15,7 @@ Current scope:
 - [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) for local transcription
 - optional [`pyannote.audio`](https://github.com/pyannote/pyannote-audio) for local speaker diarization
 
-`faster-whisper` runs locally. `pyannote.audio` also performs inference locally, but its first setup downloads gated model files and requires a Hugging Face token. Model downloads are a setup requirement; audio and transcript inference remain local.
+`faster-whisper` and `pyannote.audio` inference run locally. Their first setup downloads model files; the gated pyannote model requires a Hugging Face token for that download only. Runtime model loading is forced offline, and pyannote telemetry is disabled. Audio and transcripts are never uploaded by Transcriptor.
 
 ## Folder layout
 
@@ -39,7 +39,7 @@ uv sync --locked --extra diarization
 .venv/bin/python scripts/download_models.py --whisper-model small
 ```
 
-The model download is required first-run setup. Normal transcription is local after the model is cached. For optional speaker diarization, accept the model terms on Hugging Face and download its files with a token:
+The model download is required first-run setup. Normal transcription is local after the model is cached. For optional speaker diarization, accept the model terms on Hugging Face and use a token once to download its files:
 
 ```bash
 HUGGINGFACE_TOKEN="your-token" .venv/bin/python scripts/download_models.py --diarization
@@ -75,13 +75,13 @@ Supported audio extensions:
 Run diarization while transcribing:
 
 ```bash
-HUGGINGFACE_TOKEN="your-token" .venv/bin/python -m transcriptor.cli --diarize
+.venv/bin/python -m transcriptor.cli --diarize
 ```
 
 If you know the speaker count, pass it as a hint:
 
 ```bash
-HUGGINGFACE_TOKEN="your-token" .venv/bin/python -m transcriptor.cli --diarize --num-speakers 2
+.venv/bin/python -m transcriptor.cli --diarize --num-speakers 2
 ```
 
 What Phase 2 adds:
@@ -190,7 +190,8 @@ The CLI is the product interface: it works interactively, from `launchd`, or fro
 ## Limitations and privacy
 
 - Transcription and diarization quality depend on the selected models, recording quality, language, and available hardware.
-- Model installation may require network access even though inference and transcript storage are local.
+- Model installation requires network access. Runtime inference is forced to local cached files, and transcript storage remains local.
+- Pyannote's optional usage telemetry is disabled before the library is imported.
 - Audio, transcripts, speaker mappings, and recording metadata may contain sensitive information. Keep `data/` out of a public repository.
 - The inbox workflow processes local files; it is not a recording, meeting, or cloud-sync service.
 

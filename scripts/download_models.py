@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
 
     from faster_whisper import WhisperModel
 

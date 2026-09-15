@@ -67,14 +67,12 @@ class PyannoteDiarizer:
         self,
         *,
         model_name: str,
-        hf_token: str | None,
         device: str,
         num_speakers: int | None,
         min_speakers: int | None,
         max_speakers: int | None,
     ) -> None:
         self.model_name = model_name
-        self.hf_token = hf_token
         self.device = device
         self.num_speakers = num_speakers
         self.min_speakers = min_speakers
@@ -92,6 +90,9 @@ class PyannoteDiarizer:
         xdg_cache.mkdir(parents=True, exist_ok=True)
         os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
         os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
+        os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
         try:
             from pyannote.audio import Pipeline
         except ModuleNotFoundError as exc:
@@ -99,13 +100,14 @@ class PyannoteDiarizer:
                 "Missing dependency 'pyannote.audio'. Install with `pip install -e .[diarization]`."
             ) from exc
 
-        if self.model_name.startswith("pyannote/") and not self.hf_token:
+        try:
+            self._pipeline = Pipeline.from_pretrained(self.model_name)
+        except Exception as exc:
             raise RuntimeError(
-                "Diarization requires a Hugging Face token for the hosted pyannote model download. "
-                "Pass --hf-token or set HUGGINGFACE_TOKEN."
-            )
-
-        self._pipeline = Pipeline.from_pretrained(self.model_name, token=self.hf_token)
+                "The diarization model is not available in the local cache. Run "
+                "`HUGGINGFACE_TOKEN=... .venv/bin/python scripts/download_models.py "
+                "--diarization` once while online, then retry."
+            ) from exc
         if self.device != "cpu":
             try:
                 import torch
@@ -178,11 +180,19 @@ class WhisperTranscriber:
                 "Missing dependency 'faster-whisper'. Install the project dependencies first."
             ) from exc
 
-        self._model = WhisperModel(
-            self.model_name,
-            device=self.device,
-            compute_type=self.compute_type,
-        )
+        try:
+            self._model = WhisperModel(
+                self.model_name,
+                device=self.device,
+                compute_type=self.compute_type,
+                local_files_only=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "The Whisper model is not available in the local cache. Run "
+                "`.venv/bin/python scripts/download_models.py --whisper-model "
+                f"{self.model_name}` once while online, then retry."
+            ) from exc
         return self._model
 
     def transcribe(

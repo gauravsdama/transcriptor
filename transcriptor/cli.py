@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 from transcriptor.pipeline import (
@@ -104,14 +103,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="pyannote diarization pipeline name or local model path.",
     )
     parser.add_argument(
-        "--hf-token",
-        default=None,
-        help=(
-            "Hugging Face token used to download the diarization model. Prefer the "
-            "HUGGINGFACE_TOKEN environment variable so the token is not saved in shell history."
-        ),
-    )
-    parser.add_argument(
         "--num-speakers",
         type=int,
         default=None,
@@ -159,7 +150,6 @@ def main() -> int:
     if args.diarize:
         diarizer = PyannoteDiarizer(
             model_name=args.diarization_model,
-            hf_token=args.hf_token or os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HF_TOKEN"),
             device=args.device,
             num_speakers=args.num_speakers,
             min_speakers=args.min_speakers,
