@@ -7,15 +7,17 @@ install=false
 build=false
 test_project=false
 download_models=false
+download_diarization=false
 assume_yes=false
 
 usage() {
   printf '%s\n' \
-    'Usage: ./scripts/setup_macos.sh [--check] [--install] [--download-models] [--build] [--test] [--yes]' \
+    'Usage: ./scripts/setup_macos.sh [--check] [--install] [--download-models] [--download-diarization] [--build] [--test] [--yes]' \
     '' \
     '  --check    Inspect this Mac and project without changing anything (default).' \
     '  --install  Install project dependencies inside this checkout.' \
     '  --download-models  Download or verify the required small Whisper model.' \
+    '  --download-diarization  Run the guided optional speaker-model setup.' \
     '  --build    Run the project build commands that are available.' \
     '  --test     Run the project test commands that are available.' \
     '  --yes      Accept prompts; intended for an already-reviewed command.'
@@ -26,6 +28,7 @@ for arg in "$@"; do
     --check) ;;
     --install) install=true ;;
     --download-models) download_models=true ;;
+    --download-diarization) download_diarization=true ;;
     --build) build=true ;;
     --test) test_project=true ;;
     --yes) assume_yes=true ;;
@@ -50,7 +53,7 @@ printf 'macOS %s, %s, %s GiB memory, %s GiB free disk\n' \
   printf 'Python project: %s\n' "$(command -v python3 || echo 'python3 missing')"
 [[ -f "$project_dir/Package.swift" ]] && printf 'Swift project: %s\n' "$(command -v swift || echo 'swift missing')"
 
-if ! $install && ! $download_models && ! $build && ! $test_project; then
+if ! $install && ! $download_models && ! $download_diarization && ! $build && ! $test_project; then
   printf '%s\n' 'Check complete. No files or packages were changed.'
   exit 0
 fi
@@ -72,7 +75,7 @@ if $install; then
   fi
   if [[ -f pyproject.toml && -f uv.lock ]]; then
     command -v uv >/dev/null 2>&1 || { printf '%s\n' 'uv is required. Install it with: brew install uv' >&2; exit 1; }
-    uv sync --locked --extra diarization
+    uv sync --locked --extra diarization --extra setup
   elif [[ -f pyproject.toml ]]; then
     python3 -m venv .venv
     .venv/bin/python -m pip install -e .
@@ -86,6 +89,12 @@ if $download_models; then
   confirm 'Download or verify the required Whisper model?' || exit 0
   [[ -x .venv/bin/python ]] || { printf '%s\n' 'Install dependencies first with --install.' >&2; exit 1; }
   .venv/bin/python scripts/download_models.py --whisper-model small
+fi
+
+if $download_diarization; then
+  confirm 'Start guided diarization model setup?' || exit 0
+  [[ -x .venv/bin/python ]] || { printf '%s\n' 'Install dependencies first with --install.' >&2; exit 1; }
+  .venv/bin/python -m transcriptor.model_setup --diarization
 fi
 
 if $build; then

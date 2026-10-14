@@ -11,6 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from transcriptor.runtime_policy import enforce_offline_runtime
+
+enforce_offline_runtime()
+
 SUPPORTED_AUDIO_EXTENSIONS = {
     ".aac",
     ".aiff",
@@ -67,12 +71,14 @@ class PyannoteDiarizer:
         self,
         *,
         model_name: str,
+        model_revision: str | None,
         device: str,
         num_speakers: int | None,
         min_speakers: int | None,
         max_speakers: int | None,
     ) -> None:
         self.model_name = model_name
+        self.model_revision = model_revision
         self.device = device
         self.num_speakers = num_speakers
         self.min_speakers = min_speakers
@@ -90,9 +96,6 @@ class PyannoteDiarizer:
         xdg_cache.mkdir(parents=True, exist_ok=True)
         os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
         os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
-        os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
-        os.environ["HF_HUB_OFFLINE"] = "1"
-        os.environ["TRANSFORMERS_OFFLINE"] = "1"
         try:
             from pyannote.audio import Pipeline
         except ModuleNotFoundError as exc:
@@ -101,7 +104,11 @@ class PyannoteDiarizer:
             ) from exc
 
         try:
-            self._pipeline = Pipeline.from_pretrained(self.model_name)
+            self._pipeline = Pipeline.from_pretrained(
+                self.model_name, revision=self.model_revision
+            )
+            if self._pipeline is None:
+                raise RuntimeError("Model loader returned no pipeline.")
         except Exception as exc:
             raise RuntimeError(
                 "The diarization model is not available in the local cache. Run "
@@ -129,7 +136,9 @@ class PyannoteDiarizer:
             diarization_kwargs["max_speakers"] = self.max_speakers
 
         result = pipeline(str(audio_path), **diarization_kwargs)
-        annotation = getattr(result, "speaker_diarization", result)
+        annotation = getattr(result, "exclusive_speaker_diarization", None)
+        if annotation is None:
+            annotation = getattr(result, "speaker_diarization", result)
         if hasattr(annotation, "itertracks"):
             iterator = annotation.itertracks(yield_label=True)
         else:
@@ -275,7 +284,9 @@ class InboxTranscriptionPipeline:
         self.force = force
         self.archive_audio = archive_audio
         self.dry_run = dry_run
-        self.extensions = {suffix if suffix.startswith(".") else f".{suffix}" for suffix in extensions}
+        self.extensions = {
+            suffix if suffix.startswith(".") else f".{suffix}" for suffix in extensions
+        }
         self.diarizer = diarizer
         self.transcriber = transcriber or WhisperTranscriber(
             model_name=model_name,
@@ -322,7 +333,9 @@ class InboxTranscriptionPipeline:
                 transcript = apply_diarization(
                     transcript,
                     diarization_segments,
-                    diarization_source=getattr(self.diarizer, "model_name", self.diarizer.__class__.__name__),
+                    diarization_source=getattr(
+                        self.diarizer, "model_name", self.diarizer.__class__.__name__
+                    ),
                 )
             save_recording_document(
                 self._recording_document_path(digest),
@@ -350,8 +363,12 @@ class InboxTranscriptionPipeline:
                 "transcript_text_path": str(
                     companion_output_path(transcript_path, "txt").resolve()
                 ),
-                "archived_audio_path": str(archived_path.resolve()) if archived_path else None,
-                "recording_document_path": str(self._recording_document_path(digest).resolve()),
+                "archived_audio_path": str(archived_path.resolve())
+                if archived_path
+                else None,
+                "recording_document_path": str(
+                    self._recording_document_path(digest).resolve()
+                ),
                 "language": transcript.language,
                 "segment_count": transcript.segment_count,
                 "speaker_count": len(list_speaker_ids(transcript)),
@@ -406,7 +423,10 @@ class InboxTranscriptionPipeline:
         return self.transcripts_dir / filename
 
     def _archive_audio(self, audio_path: Path, digest: str) -> Path:
-        target = self.archive_dir / f"{audio_path.stem}--{digest[:8]}{audio_path.suffix.lower()}"
+        target = (
+            self.archive_dir
+            / f"{audio_path.stem}--{digest[:8]}{audio_path.suffix.lower()}"
+        )
         counter = 1
         while target.exists():
             target = self.archive_dir / (
@@ -437,8 +457,12 @@ def write_transcript(
     resolved_names = speaker_names or {}
     markdown_path = companion_output_path(output_path, "md")
     text_path = companion_output_path(output_path, "txt")
-    markdown_path.write_text(render_markdown(transcript, resolved_names), encoding="utf-8")
-    text_path.write_text(render_plain_text(transcript, resolved_names), encoding="utf-8")
+    markdown_path.write_text(
+        render_markdown(transcript, resolved_names), encoding="utf-8"
+    )
+    text_path.write_text(
+        render_plain_text(transcript, resolved_names), encoding="utf-8"
+    )
     if output_format not in {"md", "txt"}:
         raise RuntimeError(f"Unsupported output format: {output_format}")
 
@@ -544,7 +568,9 @@ def normalize_speaker_id(raw_speaker_id: str) -> str:
     match = re.fullmatch(r"speaker[_\s-]*(\d+)", raw_speaker_id.strip(), re.IGNORECASE)
     if match:
         return f"SPEAKER_{int(match.group(1)):02d}"
-    normalized = re.sub(r"[^A-Za-z0-9]+", "_", raw_speaker_id.strip()).strip("_").upper()
+    normalized = (
+        re.sub(r"[^A-Za-z0-9]+", "_", raw_speaker_id.strip()).strip("_").upper()
+    )
     return normalized or "SPEAKER_UNKNOWN"
 
 
@@ -721,7 +747,9 @@ def transcript_document_from_dict(payload: dict[str, Any]) -> TranscriptDocument
 def save_recording_document(path: Path, transcript: TranscriptDocument) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
-        json.dump(transcript_document_to_dict(transcript), handle, indent=2, sort_keys=True)
+        json.dump(
+            transcript_document_to_dict(transcript), handle, indent=2, sort_keys=True
+        )
         handle.write("\n")
 
 

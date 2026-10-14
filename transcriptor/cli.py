@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from transcriptor.model_config import DIARIZATION_REVISION
 from transcriptor.pipeline import (
     SUPPORTED_AUDIO_EXTENSIONS,
     InboxTranscriptionPipeline,
@@ -103,6 +104,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="pyannote diarization pipeline name or local model path.",
     )
     parser.add_argument(
+        "--diarization-revision",
+        default=DIARIZATION_REVISION,
+        help="Pinned model revision used for reproducible cached loading.",
+    )
+    parser.add_argument(
         "--num-speakers",
         type=int,
         default=None,
@@ -150,6 +156,7 @@ def main() -> int:
     if args.diarize:
         diarizer = PyannoteDiarizer(
             model_name=args.diarization_model,
+            model_revision=args.diarization_revision,
             device=args.device,
             num_speakers=args.num_speakers,
             min_speakers=args.min_speakers,

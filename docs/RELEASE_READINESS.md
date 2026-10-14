@@ -1,6 +1,6 @@
 # Transcriptor release readiness
 
-Updated: 2026-09-15
+Updated: 2026-10-14
 
 ## Product and audience
 
@@ -20,16 +20,33 @@ CLI-only is the release decision. Scheduling and batch processing are the primar
 
 - `data/` and `tmp/` are ignored in full because they contain audio, transcripts, absolute source paths, speaker mappings, and hashes.
 - The current local `data/` folder contains real recordings and transcripts. They were not modified or inspected for editorial content and must not be added to source control or a release archive.
-- `HUGGINGFACE_TOKEN` or `HF_TOKEN` is used only by `scripts/download_models.py` to download the gated diarization model during setup. Runtime commands do not accept or require a token.
-- The package has no network service or inbound port. Runtime loading uses cached files only, sets Hugging Face and Transformers offline modes, and disables pyannote telemetry before import.
+- `transcriptor.model_setup` uses a Hugging Face token only to verify access and download the gated diarization model. Interactive token input is hidden. Optional persistence uses the operating system credential store; `--remove-token` deletes it. Runtime commands do not accept or read the token.
+- The package has no network service or inbound port. Runtime loading uses cached files only, disables implicit Hugging Face credentials, sets Hugging Face and Transformers offline modes, and disables Hugging Face and pyannote telemetry before import.
+
+## Model access and storage
+
+- The Community-1 model is licensed CC BY 4.0. Access requires the user to review its conditions at <https://huggingface.co/pyannote/speaker-diarization-community-1>, share contact information with pyannote, and agree that pyannote may occasionally send model or service news. Transcriptor does not accept those conditions for the user.
+- A read token can be created at <https://huggingface.co/settings/tokens> after access is granted. The token is needed for initial diarization-model download and setup retries, not inference.
+- Setup and runtime pin Community-1 revision `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`; updates require an explicit code and lockfile review.
+- Upstream repository metadata reports approximately 464 MiB for `Systran/faster-whisper-small` and 32 MiB for `pyannote/speaker-diarization-community-1`. The Python environment and temporary download space are additional; the macOS setup check requires 3 GiB free.
+- Hugging Face caches models under `~/.cache/huggingface` by default. `HF_HOME` or `XDG_CACHE_HOME` can select another location.
 
 ## Verification evidence
 
-Verified on macOS arm64 with Python 3.12.14:
+Verified on macOS arm64. Packaging uses Python 3.12; the current dependency and runtime pass also ran under Python 3.14.4.
 
 ```text
 .venv/bin/python -m unittest discover -s tests -v
-2 tests passed
+6 tests passed
+
+uvx ruff check transcriptor scripts tests
+All checks passed
+
+uvx bandit -q -r transcriptor scripts
+No findings
+
+uvx pip-audit --path <active-site-packages>
+No known vulnerabilities
 
 .venv/bin/python -m pip check
 No broken requirements found.
@@ -45,21 +62,27 @@ uv pip install --no-deps dist/transcriptor-0.1.0-py3-none-any.whl
 transcriptor-inbox --help && transcriptor-speakers --help
 clean wheel entry-point check passed
 
-UV_PROJECT_ENVIRONMENT=/tmp/transcriptor-validation... uv sync --locked --extra diarization --python 3.12
-98 packages installed in a clean environment; dependency compatibility check passed
+UV_PROJECT_ENVIRONMENT=/tmp/transcriptor-validation... uv sync --locked --extra diarization --extra setup --python 3.12
+locked dependency installation and compatibility check passed
 
-.venv/bin/python scripts/download_models.py --whisper-model small
-required Whisper model downloaded and loaded successfully
+.venv/bin/python -m transcriptor.model_setup --whisper-model small
+required Whisper model loaded from cache; token-free cached-only verification passed
+
+network-denied 60-second private recording sample
+7.21 seconds elapsed; 887 MB maximum resident set; 0 socket messages sent or received
+
+network-denied empty-cache check
+failed with the documented local-cache setup instruction and no network fallback
 
 private representative recording validation
 1289.75 seconds; 246 transcript segments; English detected; no transcript text retained in the repository
 
 dependency reports
-97-component CycloneDX SBOM; 97 license records; 0 unresolved license identifiers after installed license-text review
+103-component CycloneDX SBOM; 102 installed dependency license records
 ```
 
 The generated reports are `docs/dependencies/sbom.cdx.json` and `docs/dependencies/licenses.json`.
 
 ## Status
 
-**Ready for source publication with diarization still experimental.** Git provenance, Apache-2.0 licensing, full locked installation, Whisper model setup, real-recording transcription, SBOM, and dependency license reporting are in place. One validation remains blocked by model access: accept the `pyannote/speaker-diarization-community-1` terms, use `HUGGINGFACE_TOKEN` once with `scripts/download_models.py --diarization`, and rerun a representative two-speaker recording with `--diarize --num-speakers 2`. The validation run itself is offline. Until then, keep diarization labeled experimental.
+**Ready for source publication with diarization still experimental.** Git provenance, Apache-2.0 licensing, locked installation, Whisper setup, real-recording transcription, offline enforcement, secure token setup, SBOM, and dependency license reporting are in place. The remaining validation requires owner action: accept the `pyannote/speaker-diarization-community-1` conditions, run `.venv/bin/python -m transcriptor.model_setup --diarization`, and make a representative two-speaker recording available outside the macOS-protected Voice Memos container. The validation run itself will be offline. Until it passes, keep diarization labeled experimental.

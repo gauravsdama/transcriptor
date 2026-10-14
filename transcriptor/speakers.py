@@ -26,7 +26,9 @@ class SpeakerNamingService:
 
     def show_recording(self, recording_id: str) -> str:
         transcript = load_recording_document(self._recording_path(recording_id))
-        speaker_names = load_speaker_names(self.speaker_names_file).get(recording_id, {})
+        speaker_names = load_speaker_names(self.speaker_names_file).get(
+            recording_id, {}
+        )
         lines = [
             f"Recording ID: {recording_id}",
             f"Transcript path: {transcript.transcript_path}",
@@ -62,7 +64,9 @@ class SpeakerNamingService:
 
     def rerender_recording(self, recording_id: str) -> None:
         transcript = load_recording_document(self._recording_path(recording_id))
-        speaker_names = load_speaker_names(self.speaker_names_file).get(recording_id, {})
+        speaker_names = load_speaker_names(self.speaker_names_file).get(
+            recording_id, {}
+        )
         write_transcript(
             Path(transcript.transcript_path),
             transcript,
@@ -112,7 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
     set_parser.add_argument("speaker_id")
     set_parser.add_argument("name")
 
-    unset_parser = subparsers.add_parser("unset", help="Remove a speaker name assignment.")
+    unset_parser = subparsers.add_parser(
+        "unset", help="Remove a speaker name assignment."
+    )
     unset_parser.add_argument("recording_id")
     unset_parser.add_argument("speaker_id")
 
@@ -143,11 +149,15 @@ def main() -> int:
             return 0
         if args.command == "set":
             service.set_speaker_name(args.recording_id, args.speaker_id, args.name)
-            print(f"Updated {args.recording_id} {normalize_speaker_id(args.speaker_id)} -> {args.name}")
+            print(
+                f"Updated {args.recording_id} {normalize_speaker_id(args.speaker_id)} -> {args.name}"
+            )
             return 0
         if args.command == "unset":
             service.unset_speaker_name(args.recording_id, args.speaker_id)
-            print(f"Removed name for {args.recording_id} {normalize_speaker_id(args.speaker_id)}")
+            print(
+                f"Removed name for {args.recording_id} {normalize_speaker_id(args.speaker_id)}"
+            )
             return 0
         if args.command == "rerender":
             service.rerender_recording(args.recording_id)

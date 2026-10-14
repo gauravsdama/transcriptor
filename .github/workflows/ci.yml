@@ -15,6 +15,12 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --extra diarization --extra setup
+      - run: uvx ruff==0.17.0 check transcriptor scripts tests
       - run: uv run python -m unittest discover -s tests -v
+      - run: uvx bandit==1.9.4 -q -r transcriptor scripts
+      - name: Audit installed dependencies
+        run: |
+          site_packages=$(uv run python -c 'import site; print(site.getsitepackages()[0])')
+          uvx pip-audit==2.10.1 --path "$site_packages"
       - run: uv build

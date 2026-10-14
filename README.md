@@ -32,18 +32,28 @@ data/
 
 ## Setup
 
-Install the locked full environment with Python 3.12 or newer, then download the required local Whisper model:
+Install the locked environment with Python 3.12 or newer, then run the model setup:
 
 ```bash
-uv sync --locked --extra diarization
-.venv/bin/python scripts/download_models.py --whisper-model small
+uv sync --locked --extra diarization --extra setup
+.venv/bin/python -m transcriptor.model_setup
 ```
 
-The model download is required first-run setup. Normal transcription is local after the model is cached. For optional speaker diarization, accept the model terms on Hugging Face and use a token once to download its files:
+The default Whisper model is about 464 MiB. The setup command reports the cache location and verifies token-free, cached-only loading before it finishes. Normal transcription is local after that.
+
+Optional speaker diarization uses a pinned revision of [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1), whose files are about 32 MiB and carry a CC BY 4.0 license. Its access form asks you to share contact information with pyannote and agree that pyannote may occasionally email model or service news. Review those conditions yourself, grant access, create a read token, then run:
 
 ```bash
-HUGGINGFACE_TOKEN="your-token" .venv/bin/python scripts/download_models.py --diarization
+.venv/bin/python -m transcriptor.model_setup --diarization
 ```
+
+The guided flow hides token input, verifies access without printing the token, and can store it in the operating system credential store for setup retries. Transcription and diarization never read the stored token. Remove it at any time with:
+
+```bash
+.venv/bin/python -m transcriptor.model_setup --remove-token
+```
+
+Model caches normally live at `~/.cache/huggingface`; `HF_HOME` or `XDG_CACHE_HOME` can relocate them. The complete Python environment is substantially larger than the model files, so keep at least 3 GiB free during installation.
 
 ## Usage
 
@@ -190,8 +200,8 @@ The CLI is the product interface: it works interactively, from `launchd`, or fro
 ## Limitations and privacy
 
 - Transcription and diarization quality depend on the selected models, recording quality, language, and available hardware.
-- Model installation requires network access. Runtime inference is forced to local cached files, and transcript storage remains local.
-- Pyannote's optional usage telemetry is disabled before the library is imported.
+- Model installation requires network access. Runtime inference forces Hugging Face and Transformers offline modes, disables implicit token use, and loads cached files only.
+- Hugging Face and pyannote usage telemetry are disabled before their runtime libraries are imported.
 - Audio, transcripts, speaker mappings, and recording metadata may contain sensitive information. Keep `data/` out of a public repository.
 - The inbox workflow processes local files; it is not a recording, meeting, or cloud-sync service.
 

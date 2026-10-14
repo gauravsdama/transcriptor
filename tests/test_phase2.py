@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from transcriptor.model_setup import (
+    KEYRING_ACCOUNT,
+    KEYRING_SERVICE,
+    _get_setup_token,
+    _remove_token,
+    _save_token,
+    cache_root,
+    format_bytes,
+)
 from transcriptor.pipeline import (
     DiarizationSegment,
     InboxTranscriptionPipeline,
@@ -14,7 +25,33 @@ from transcriptor.pipeline import (
     load_recording_document,
     sha256_for_file,
 )
+from transcriptor.runtime_policy import (
+    OFFLINE_RUNTIME_ENVIRONMENT,
+    enforce_offline_runtime,
+)
 from transcriptor.speakers import SpeakerNamingService
+
+
+class MemoryCredentialStore:
+    def __init__(self) -> None:
+        self.value: str | None = None
+
+    def get_password(self, service: str, account: str) -> str | None:
+        self._check(service, account)
+        return self.value
+
+    def set_password(self, service: str, account: str, password: str) -> None:
+        self._check(service, account)
+        self.value = password
+
+    def delete_password(self, service: str, account: str) -> None:
+        self._check(service, account)
+        self.value = None
+
+    @staticmethod
+    def _check(service: str, account: str) -> None:
+        if service != KEYRING_SERVICE or account != KEYRING_ACCOUNT:
+            raise AssertionError("unexpected credential key")
 
 
 class FakeTranscriber:
@@ -61,6 +98,35 @@ class FakeDiarizer:
 
 
 class Phase2Tests(unittest.TestCase):
+    def test_runtime_policy_forces_offline_and_disables_telemetry(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            enforce_offline_runtime()
+            for key, value in OFFLINE_RUNTIME_ENVIRONMENT.items():
+                self.assertEqual(os.environ[key], value)
+
+    def test_setup_token_uses_system_store_and_can_be_removed(self) -> None:
+        store = MemoryCredentialStore()
+        _save_token(store, "secret-value")
+        with patch.dict(os.environ, {}, clear=True):
+            token, source = _get_setup_token(store, allow_prompt=False)
+        self.assertEqual(token, "secret-value")
+        self.assertEqual(source, "system credential store")
+        self.assertTrue(_remove_token(store))
+        self.assertFalse(_remove_token(store))
+
+    def test_setup_token_prefers_explicit_environment(self) -> None:
+        store = MemoryCredentialStore()
+        store.value = "stored-value"
+        with patch.dict(os.environ, {"HF_TOKEN": "environment-value"}, clear=True):
+            token, source = _get_setup_token(store, allow_prompt=False)
+        self.assertEqual(token, "environment-value")
+        self.assertEqual(source, "environment")
+
+    def test_cache_path_and_size_formatting(self) -> None:
+        with patch.dict(os.environ, {"HF_HOME": "/tmp/test-hf-home"}, clear=True):
+            self.assertEqual(cache_root(), Path("/tmp/test-hf-home"))
+        self.assertEqual(format_bytes(1024 * 1024), "1.0 MiB")
+
     def test_apply_diarization_assigns_best_overlap(self) -> None:
         transcript = TranscriptDocument(
             recording_id="abc123",
