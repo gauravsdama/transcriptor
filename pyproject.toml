@@ -19,7 +19,7 @@ diarization = [
   "pyannote.audio>=4.0.7,<5",
 ]
 setup = [
-  "keyring>=25,<26",
+  "keyring>=25.7.0,<26",
 ]
 
 [project.scripts]
